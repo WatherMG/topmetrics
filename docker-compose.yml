@@ -1,0 +1,28 @@
+version: "3.8"
+
+services:
+  server:
+    build:
+      context: .
+      dockerfile: cmd/server/Dockerfile
+    restart:
+      always
+    hostname: server
+    ports:
+      - "8080:8080"
+    volumes:
+      - logs:/home/go/github.com/WatherMG/topmetrics
+#  agent:
+#    build:
+#      context: .
+#      dockerfile: cmd/agent/Dockerfile
+#    depends_on:
+#      - server
+
+volumes:
+  logs:
+    driver: local
+
+
+
+

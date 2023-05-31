@@ -2,18 +2,24 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net"
+	"os"
+	"path/filepath"
 	"strings"
-	"time"
 
 	"topmetrics/pkg/metric"
 )
 
 func main() {
-	listener, err := net.Listen("tcp", "localhost:4444")
+	tcp := &net.TCPAddr{
+		IP:   net.ParseIP("0.0.0.0"),
+		Port: 8080,
+	}
+	listener, err := net.ListenTCP("tcp", tcp)
 	if err != nil {
 		log.Fatalf("Error listening: %v", err.Error())
 		return
@@ -24,13 +30,12 @@ func main() {
 	log.Printf("Listening on: %s", listener.Addr().String())
 
 	for {
-		log.Printf("Waiting conetcion from agent")
+		log.Printf("Waiting connection from agent")
 		conn, err := listener.Accept()
 		if err != nil {
 			log.Printf("Error accepting: %v", err.Error())
 			continue
 		}
-
 		go handleConnection(conn)
 	}
 }
@@ -40,6 +45,7 @@ func handleConnection(conn net.Conn) {
 		_ = conn.Close()
 		log.Printf("Agent %s disconnected\n", conn.RemoteAddr())
 	}()
+
 	ch := make(chan metric.Metric)
 
 	go clientWriter(ch)
@@ -63,8 +69,30 @@ func handleConnection(conn net.Conn) {
 func clientWriter(ch <-chan metric.Metric) {
 	procs := <-ch
 	log.Printf("Write data")
-	fmt.Println(procs.Hostname, time.Since(procs.SentAt).String()+" ago:")
-	for _, process := range procs.Processes {
-		fmt.Printf("PID:%d\tNAME: %s\tCPU USAGE: %.2f%%\tMEMORY USAGE:%.2f MB\n", process.PID, process.Name, process.CPUPercent, process.Memory)
+	host := procs.HostID
+
+	buff := &bytes.Buffer{}
+	file, err := os.OpenFile("./logs/"+host+".log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Println(err)
 	}
+
+	dir, err := os.Getwd()
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	defer file.Close()
+
+	for _, process := range procs.Processes {
+		fmt.Fprintf(buff, "PID:%d\nNAME: %s\nCPU USAGE: %.2f%%\nMEMORY USAGE: %.2f MB\n", process.PID, process.Name, process.CPUPercent, process.Memory)
+		fmt.Fprintf(buff, "--------------------------------------------------\n")
+	}
+	if _, err := file.Write(buff.Bytes()); err != nil {
+		log.Println(err)
+	}
+
+	fullPath := filepath.Join(dir)
+	log.Println("Data added into", fullPath)
 }

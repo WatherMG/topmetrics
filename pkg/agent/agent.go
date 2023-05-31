@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"os"
 	"time"
 
 	"topmetrics/pkg/metric"
@@ -17,42 +16,44 @@ import (
 func Send(ctx context.Context, ch chan []*process.Process, duration *time.Duration, metricCount *int, host, port string) {
 	ticker := time.NewTicker(*duration)
 	defer ticker.Stop()
+	var failedAttempts = 0
 
 	for {
+		if failedAttempts >= 3 {
+			log.Println("Server is not responding. Exit.")
+			break
+		}
 		select {
 		case <-ctx.Done():
 			log.Println("Metrics sending complete.")
 			return
 		case processes := <-ch:
 			if len(processes) < *metricCount {
+				log.Printf("Processes is < metricCount=%d, continue\n", *metricCount)
 				continue
 			}
 
 			metricInfo := &metric.Metric{}
 			if err := metricInfo.Get(ctx, processes, metricCount); err != nil {
 				log.Println(err)
-				continue
 			}
-
 			jsonData, err := json.Marshal(metricInfo)
 			if err != nil {
 				log.Println(err)
-				continue
 			}
-			if host == "" || port == "" {
-				log.Println("Host or port is missing.")
-				os.Exit(1)
-			}
-			if err := sendMetrics(jsonData, host, port); err != nil {
+			if err := sendMetrics(jsonData, host, port, 3*time.Second); err != nil {
 				log.Println(err)
-				continue
+				failedAttempts++
 			}
 		}
 	}
 }
 
-func sendMetrics(jsonData []byte, host, port string) error {
-	conn, err := net.Dial("tcp", host+":"+port)
+func sendMetrics(jsonData []byte, host, port string, timeout time.Duration) error {
+	hostname := fmt.Sprintf("%s:%s", host, port)
+	log.Println("Try to connect to", hostname)
+
+	conn, err := net.DialTimeout("tcp", hostname, timeout)
 	if err != nil {
 		return fmt.Errorf("error connecting: %v", err.Error())
 	}
