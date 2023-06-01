@@ -1,5 +1,14 @@
 version: "3.8"
 
+volumes:
+  logs:
+    driver: local
+  elasticsearch-data:
+    driver: local
+
+networks:
+  elk:
+
 services:
   server:
     build:
@@ -11,17 +20,45 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - logs:/home/go/github.com/WatherMG/topmetrics
-#  agent:
-#    build:
-#      context: .
-#      dockerfile: cmd/agent/Dockerfile
-#    depends_on:
-#      - server
-
-volumes:
-  logs:
-    driver: local
+      - ./logs:/home/go/github.com/WatherMG/topmetrics/logs
+  agent:
+    build:
+      context: .
+      dockerfile: cmd/agent/Dockerfile
+    depends_on:
+      - server
+      - logstash
+  agent2:
+    build:
+      context: .
+      dockerfile: cmd/agent/Dockerfile
+    depends_on:
+      - server
+      - logstash
+  logstash:
+    container_name: logstash_one_channel
+    image: logstash:8.7.1
+    networks:
+      - elk
+#    environment:
+#      XPACK_MONITORING_ENABLED: "false"
+    ports:
+      - "5046:5046"
+    volumes:
+      - ./configs/logstash/pipelines.yml:/usr/share/logstash/config/pipelines.yml:ro
+      - ./configs/logstash/pipelines:/usr/share/logstash/config/pipelines:ro
+      - ./logs:/usr/share/logstash/input
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+  elasticsearch:
+    image: elasticsearch:8.7.1
+    environment:
+      - discovery.type=single-node
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    networks:
+      - elk
 
 
 

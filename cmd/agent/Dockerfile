@@ -18,4 +18,4 @@ RUN go build -o agent ./cmd/agent/main.go
 #FROM gcr.io/distroless/base
 #COPY --from=builder /go/app/ .
 
-CMD ["./agent", "-count", "1"]
+CMD ["./agent", "-count", "1", "-interval", "2s", "-timeout", "10s"]

@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"topmetrics/pkg/metric"
 )
@@ -85,14 +86,15 @@ func clientWriter(ch <-chan metric.Metric) {
 
 	defer file.Close()
 
+	fmt.Fprintf(buff, "HOSTINFO: %s %s %v ", procs.Hostname, procs.HostID, procs.SentAt.Format(time.RFC3339Nano))
 	for _, process := range procs.Processes {
-		fmt.Fprintf(buff, "PID:%d\nNAME: %s\nCPU USAGE: %.2f%%\nMEMORY USAGE: %.2f MB\n", process.PID, process.Name, process.CPUPercent, process.Memory)
-		fmt.Fprintf(buff, "--------------------------------------------------\n")
+		fmt.Fprintf(buff, "PROCESSINFO: pid: %d process_name: %s cpu_percent: %.2f memory_usage: %.2f ", process.PID, process.Name, process.CPUPercent, process.Memory)
 	}
+	buff.WriteRune('\n')
 	if _, err := file.Write(buff.Bytes()); err != nil {
 		log.Println(err)
 	}
 
-	fullPath := filepath.Join(dir)
+	fullPath := filepath.Join(dir, file.Name())
 	log.Println("Data added into", fullPath)
 }
