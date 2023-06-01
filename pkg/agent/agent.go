@@ -13,7 +13,7 @@ import (
 	"github.com/shirou/gopsutil/v3/process"
 )
 
-func Send(ctx context.Context, ch chan []*process.Process, duration *time.Duration, metricCount *int, host, port string) {
+func Send(ctx context.Context, ch chan []*process.Process, duration *time.Duration, metricCount *int, host, port string, hostname string) {
 	ticker := time.NewTicker(*duration)
 	defer ticker.Stop()
 	var failedAttempts = 0
@@ -36,6 +36,9 @@ func Send(ctx context.Context, ch chan []*process.Process, duration *time.Durati
 			metricInfo := &metric.Metric{}
 			if err := metricInfo.Get(ctx, processes, metricCount); err != nil {
 				log.Println(err)
+			}
+			if hostname != "" {
+				metricInfo.Hostname = hostname
 			}
 			jsonData, err := json.Marshal(metricInfo)
 			if err != nil {

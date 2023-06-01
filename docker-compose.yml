@@ -22,29 +22,28 @@ services:
     volumes:
       - ./logs:/home/go/github.com/WatherMG/topmetrics/logs
     depends_on:
-      - logstash
-      - elasticsearch
-      - kibana
-  agent:
-    build:
-      context: .
-      dockerfile: cmd/agent/Dockerfile
-    depends_on:
-      - server
-  agent2:
-    build:
-      context: .
-      dockerfile: cmd/agent/Dockerfile
-    depends_on:
-      - server
-      - logstash
+      elasticsearch:
+        condition: service_healthy
+      kibana:
+        condition: service_healthy
+#  agent:
+#    build:
+#      context: .
+#      dockerfile: cmd/agent/Dockerfile
+#    depends_on:
+#      - server
+#  agent2:
+#    build:
+#      context: .
+#      dockerfile: cmd/agent/Dockerfile
+#    depends_on:
+#      - server
+#      - logstash
   logstash:
     container_name: logstash_one_channel
     image: logstash:8.7.1
     networks:
       - elk
-#    environment:
-#      XPACK_MONITORING_ENABLED: "false"
     ports:
       - "5046:5046"
     volumes:
@@ -86,6 +85,11 @@ services:
       - "5601:5601"
     networks:
       - elk
+    healthcheck:
+      test: [ "CMD", "curl", "-s", "-f", "http://localhost:5601/api/status" ]
+      interval: 3s
+      timeout: 3s
+      retries: 50
     depends_on:
       - elasticsearch
 

@@ -17,6 +17,7 @@ var (
 	timeout     = flag.Duration("timeout", 1*time.Minute, "Duration of metrics sending in minutes")
 	host        = flag.String("host", "192.168.0.199", "Server address")
 	port        = flag.String("port", "8080", "Server port")
+	hostname    = flag.String("hostname", "", "Custom hostname")
 )
 
 func main() {
@@ -29,5 +30,5 @@ func main() {
 
 	go metric.Collect(ctx, processes, interval)
 
-	agent.Send(ctx, processes, interval, metricCount, *host, *port)
+	agent.Send(ctx, processes, interval, metricCount, *host, *port, *hostname)
 }
