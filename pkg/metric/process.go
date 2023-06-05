@@ -45,10 +45,10 @@ func (p *ProcessInfo) Get(ctx context.Context, process *process.Process) (*Proce
 		return p, err
 	}
 
-	p.PID = process.Pid
+	p.Pid = process.Pid
 	p.Name = name
-	p.CPUPercent = cpu
-	p.Memory = float64(mem.RSS) / math.Pow(1024, 2)
+	p.CpuPercent = cpu
+	p.MemoryUsage = float64(mem.RSS) / math.Pow(1024, 2)
 
 	return p, nil
 }

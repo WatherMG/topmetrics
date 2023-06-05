@@ -2,7 +2,6 @@ package agent
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"net"
@@ -13,7 +12,7 @@ import (
 	"github.com/shirou/gopsutil/v3/process"
 )
 
-func Send(ctx context.Context, ch chan []*process.Process, duration *time.Duration, metricCount *int, host, port string, hostname string) {
+func Send(ctx context.Context, ch chan []*process.Process, duration *time.Duration, metricCount *int, host, port string, hostname string, serializeType string) {
 	ticker := time.NewTicker(*duration)
 	defer ticker.Stop()
 	var failedAttempts = 0
@@ -40,11 +39,35 @@ func Send(ctx context.Context, ch chan []*process.Process, duration *time.Durati
 			if hostname != "" {
 				metricInfo.Hostname = hostname
 			}
-			jsonData, err := json.Marshal(metricInfo)
+
+			var serializer interface{}
+
+			// dataType. Set the type of data sent to the server
+			var dataType byte
+
+			switch serializeType {
+			case "j", "json", "Json", "JSON":
+				serializer = &metric.JSONSerialize{}
+				dataType = metric.JSONType
+			case "g", "gob", "Gob", "GOB":
+				serializer = &metric.GOBSerialize{}
+				dataType = metric.GOBType
+			case "p", "proto", "Proto", "PROTO":
+				serializer = &metric.ProtoSerialize{}
+				dataType = metric.ProtoType
+			default:
+				serializer = &metric.JSONSerialize{}
+				dataType = metric.JSONType
+				log.Println("Use default serializer")
+			}
+
+			data, err := metric.Marshal(serializer, metricInfo)
 			if err != nil {
 				log.Println(err)
+				continue
 			}
-			if err := sendMetrics(jsonData, host, port, 3*time.Second); err != nil {
+			data = append([]byte{dataType}, data...)
+			if err := sendMetrics(data, host, port, 3*time.Second); err != nil {
 				log.Println(err)
 				failedAttempts++
 			}

@@ -2,10 +2,10 @@ package metric
 
 import (
 	"context"
-	"time"
 
 	"github.com/shirou/gopsutil/v3/host"
 	"github.com/shirou/gopsutil/v3/process"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func (m *Metric) Get(ctx context.Context, processes []*process.Process, metricCount *int) error {
@@ -26,8 +26,8 @@ func (m *Metric) Get(ctx context.Context, processes []*process.Process, metricCo
 	}
 
 	m.Hostname = hostname.Hostname
-	m.HostID = hostname.HostID
-	m.SentAt = time.Now()
+	m.HostId = hostname.HostID
+	m.SentAt = timestamppb.Now()
 
 	return nil
 }
