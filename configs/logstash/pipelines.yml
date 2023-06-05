@@ -1,4 +1,6 @@
-- pipeline.id: TOPMETRICS
-  pipeline.workers: 1
-  pipeline.batch.size: 1
-  path.config: "./config/pipelines/topmetrics_pipeline.conf"
+- pipeline.id: topmetric_beats
+#  pipeline.workers: 4
+  pipeline.batch.size: 125
+  path.config: "./config/pipelines/topmetrics_logs.conf"
+#- pipeline.id: topmetrics_json
+#  path.config: "/.config/pipelines/topmetrics_json.conf"
