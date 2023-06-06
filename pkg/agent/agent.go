@@ -1,99 +1,45 @@
 package agent
 
 import (
-	"context"
-	"fmt"
-	"log"
-	"net"
+	"os"
 	"time"
-
-	"topmetrics/pkg/metric"
-
-	"github.com/shirou/gopsutil/v3/process"
 )
 
-func Send(ctx context.Context, ch chan []*process.Process, duration *time.Duration, metricCount *int, host, port string, hostname string, serializeType string) {
-	ticker := time.NewTicker(*duration)
-	defer ticker.Stop()
-	var failedAttempts = 0
+const (
+	maxFailedAttempts = 3
+	sendTimeout       = 3 * time.Second
+)
 
-	for {
-		if failedAttempts >= 3 {
-			log.Println("Server is not responding. Exit.")
-			break
-		}
-		select {
-		case <-ctx.Done():
-			log.Println("Metrics sending complete.")
-			return
-		case processes := <-ch:
-			if len(processes) < *metricCount {
-				log.Printf("Processes is < metricCount=%d, continue\n", *metricCount)
-				continue
-			}
-
-			metricInfo := &metric.Metric{}
-			if err := metricInfo.Get(ctx, processes, metricCount); err != nil {
-				log.Println(err)
-			}
-			if hostname != "" {
-				metricInfo.Hostname = hostname
-			}
-
-			var serializer interface{}
-
-			// dataType. Set the type of data sent to the server
-			var dataType byte
-
-			switch serializeType {
-			case "j", "json", "Json", "JSON":
-				serializer = &metric.JSONSerialize{}
-				dataType = metric.JSONType
-			case "g", "gob", "Gob", "GOB":
-				serializer = &metric.GOBSerialize{}
-				dataType = metric.GOBType
-			case "p", "proto", "Proto", "PROTO":
-				serializer = &metric.ProtoSerialize{}
-				dataType = metric.ProtoType
-			default:
-				serializer = &metric.JSONSerialize{}
-				dataType = metric.JSONType
-				log.Println("Use default serializer")
-			}
-
-			data, err := metric.Marshal(serializer, metricInfo)
-			if err != nil {
-				log.Println(err)
-				continue
-			}
-			data = append([]byte{dataType}, data...)
-			if err := sendMetrics(data, host, port, 3*time.Second); err != nil {
-				log.Println(err)
-				failedAttempts++
-			}
-		}
-	}
+type Config struct {
+	Host          string
+	Port          string
+	Hostname      string
+	SerializeType string
+	MetricCount   int
 }
 
-func sendMetrics(jsonData []byte, host, port string, timeout time.Duration) error {
-	hostname := fmt.Sprintf("%s:%s", host, port)
-	log.Println("Try to connect to", hostname)
-
-	conn, err := net.DialTimeout("tcp", hostname, timeout)
-	if err != nil {
-		return fmt.Errorf("error connecting: %v", err.Error())
+func NewConfig(host, port, hostname, serializeType string, metricCount int) (*Config, error) {
+	config := &Config{
+		Host:          host,
+		Port:          port,
+		SerializeType: serializeType,
+		MetricCount:   metricCount,
 	}
-	defer func() {
-		if err := conn.Close(); err != nil {
-			log.Println(err)
-		}
-	}()
-	log.Printf("Connected to: %s", conn.RemoteAddr().String())
-	n, err := conn.Write(jsonData)
-	if err != nil {
-		return fmt.Errorf("error send data: %v", err.Error())
+	if err := config.SetHostname(hostname); err != nil {
+		return nil, err
 	}
-	log.Printf("Data sent: %d bytes\n", n)
+	return config, nil
+}
 
+func (c *Config) SetHostname(hostname string) error {
+	if hostname != "" {
+		c.Hostname = hostname
+		return nil
+	}
+	name, err := os.Hostname()
+	if err != nil {
+		return err
+	}
+	c.Hostname = name
 	return nil
 }

@@ -29,6 +29,6 @@ func main() {
 			log.Printf("Error accepting: %v", err.Error())
 			continue
 		}
-		go server.HandleConnection(conn)
+		go server.ReceiveMetricHandler(conn)
 	}
 }

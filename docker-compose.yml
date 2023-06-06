@@ -40,16 +40,18 @@ services:
 #      - server
 #      - logstash
   logstash:
-    container_name: logstash_one_channel
     image: logstash:8.7.1
+    command: bash -c "bin/logstash-plugin install logstash-codec-protobuf && bin/logstash"
     networks:
       - elk
     ports:
-      - "5046:5046"
+      - "5044:5044"
+      - "5045:5045"
     volumes:
+      - ./configs/logstash/pipelines/:/usr/share/logstash/config/pipelines/:ro
       - ./configs/logstash/pipelines.yml:/usr/share/logstash/config/pipelines.yml:ro
-      - ./configs/logstash/pipelines:/usr/share/logstash/config/pipelines:ro
-      - ./logs:/usr/share/logstash/input
+      - ./configs/logstash/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
+      - ./logs:/usr/share/logstash/input:ro
     depends_on:
       elasticsearch:
         condition: service_healthy

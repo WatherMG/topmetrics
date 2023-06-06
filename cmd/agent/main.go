@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"log"
 	"time"
 
 	"topmetrics/pkg/agent"
@@ -18,7 +19,7 @@ var (
 	host          = flag.String("host", "192.168.0.199", "Server address")
 	port          = flag.String("port", "8080", "Server port")
 	hostname      = flag.String("hostname", "", "Custom hostname")
-	serializeType = flag.String("type", "json", "Type of serialization")
+	serializeType = flag.String("type", "proto", "Type of serialization")
 )
 
 func main() {
@@ -28,17 +29,14 @@ func main() {
 	defer cancel()
 
 	processes := make(chan []*process.Process)
+	config, err := agent.NewConfig(*host, *port, *hostname, *serializeType, *metricCount)
+	if err != nil {
+		log.Printf("Config error: %v", err)
+	}
 
 	go metric.Collect(ctx, processes, interval)
 
-	agent.Send(
-		ctx,
-		processes,
-		interval,
-		metricCount,
-		*host,
-		*port,
-		*hostname,
-		*serializeType,
-	)
+	if err = agent.Send(ctx, processes, interval, config); err != nil {
+		log.Printf("Send error: %v", err)
+	}
 }

@@ -1,157 +1,62 @@
 package server
 
 import (
-	"bytes"
 	"fmt"
-	"io"
 	"log"
 	"net"
-	"os"
-	"path/filepath"
-	"sync"
-	"time"
 
+	"topmetrics/pkg/logstash"
 	"topmetrics/pkg/metric"
 )
 
 const (
-	maxReadBufferSize  = 1024
-	maxCacheSize       = 100
+	maxReadBufferSize = 1024
+	maxCacheSize      = 100
+	maxFailedAttempts = 3
 )
 
-func HandleConnection(conn net.Conn) {
-	// dataType. Defining the type of data from client
-	dataType := make([]byte, 1)
-	_, err := conn.Read(dataType)
-	if err != nil {
-		log.Printf("Can't read data type: %v\n", err)
-		return
-	}
-
-	defer func() {
-		err = conn.Close()
-		if err != nil {
-			log.Printf("Can't close connection: %v\n", err)
-		}
-		log.Printf("Agent %s disconnected\n", conn.RemoteAddr())
-	}()
-
-	metrica := &metric.Metric{}
-	var buf = make([]byte, maxReadBufferSize)
-	n, err := conn.Read(buf)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	log.Printf("Recived: %d bytes\n", n)
-	data := buf[:n]
-
+func ReceiveMetricHandler(conn net.Conn) {
 	metricsCh := make(chan *metric.Metric)
-	go agentWriter(metricsCh)
-
-	serializer, err := createSerializer(dataType[0])
+	dataType, data, err := readData(conn)
 	if err != nil {
 		log.Println(err)
 	}
 
-	if err := metric.Unmarshal(serializer, data, metrica); err != nil {
-		log.Println(err)
-		return
-	}
+	defer closeConnection(conn)
 
-	if metrica.Processes != nil && metrica.Hostname != "" && metrica.HostId != "" {
-		metricsCh <- metrica
-	}
-}
-
-// createSerializer create serializer depending on dataType
-func createSerializer(dataType byte) (interface{}, error) {
-	var serializer interface{}
 	switch dataType {
-	case metric.JSONType:
-		serializer = &metric.JSONSerialize{}
-	case metric.GOBType:
-		serializer = &metric.GOBSerialize{}
-	case metric.ProtoType:
-		serializer = &metric.ProtoSerialize{}
-	default:
-		return nil, fmt.Errorf("unknown data type: %v", dataType)
-	}
-	return serializer, nil
-}
-
-func agentWriter(ch <-chan *metric.Metric) {
-	metrica := <-ch
-	log.Printf("Writing data")
-	host := metrica.Hostname + "_" + metrica.HostId
-
-	filePath, ok := filePathCache[host]
-	if !ok {
-		filePath = createFilePath(host)
-		// remove key from filePathCache if buffer >= maxCacheSize
-		if len(filePathCache) >= maxCacheSize {
-			for k := range filePathCache {
-				delete(filePathCache, k)
-				break
-			}
-		}
-		filePathCache[host] = filePath
-	}
-
-	file, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	defer func(file *os.File) {
-		err := file.Close()
+	case metric.JSONType, metric.ProtoType:
+		err = sendDataToLogstash(data, dataType)
 		if err != nil {
 			log.Println(err)
 		}
-	}(file)
+	case metric.GOBType:
+		metricInfo, err := unmarshalData(dataType, data)
+		if err != nil {
+			log.Println(err)
+		}
+		go logfileWriter(metricsCh)
 
-	sentAt := metrica.SentAt.AsTime()
-	buff := &bytes.Buffer{}
-
-	fmt.Fprintf(buff, "HOSTINFO: %s %s %v ", metrica.Hostname, metrica.HostId, sentAt.Format(time.RFC3339Nano))
-	for _, process := range metrica.Processes {
-		pid := process.Pid
-		name := process.Name
-		cpuUsage := process.CpuPercent
-		memoryUsage := process.MemoryUsage
-		if _, err := fmt.Fprintf(buff, "PROCESSINFO: pid: %d process_name: %s cpu_percent: %.2f memory_usage: %.2f ", pid, name, cpuUsage, memoryUsage); err != nil {
-			log.Panic("writing error: ", err, process)
+		if metricInfo.Processes != nil && metricInfo.Hostname != "" && metricInfo.HostId != "" {
+			metricsCh <- metricInfo
 		}
 	}
-	buff.WriteRune('\n')
-	if err := fileWriter(file, buff.Bytes()); err != nil {
-		log.Println(err)
-		return
+}
+
+var failedAttempts = 0
+
+func sendDataToLogstash(data []byte, dataType byte) error {
+	if failedAttempts >= maxFailedAttempts {
+		return fmt.Errorf("logstash is not responding after %d attempts. dataType flag: %d", maxFailedAttempts, dataType)
 	}
-
-	log.Println("Data added into:", filePath)
-}
-
-var filePathCache = make(map[string]string)
-
-func createFilePath(host string) string {
-	return filepath.Join(getWorkingDir(), "logs", host+".log")
-}
-
-func fileWriter(file io.Writer, data []byte) error {
-	var mutex sync.Mutex
-	mutex.Lock()
-	defer mutex.Unlock()
-	if _, err := file.Write(data); err != nil {
+	config, err := logstash.GetLogstashConfig(dataType)
+	if err != nil {
+		return err
+	}
+	err = config.SendMetric(data)
+	if err != nil {
+		failedAttempts++
 		return err
 	}
 	return nil
-}
-
-func getWorkingDir() string {
-	dir, err := os.Getwd()
-	if err != nil {
-		log.Fatal(err)
-	}
-	return dir
 }

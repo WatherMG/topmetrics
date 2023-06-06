@@ -31,7 +31,8 @@ func Collect(ctx context.Context, ch chan []*process.Process, duration *time.Dur
 	}
 }
 
-func (p *ProcessInfo) Get(ctx context.Context, process *process.Process) (*ProcessInfo, error) {
+func NewProcess(ctx context.Context, process *process.Process) (*ProcessInfo, error) {
+	p := &ProcessInfo{}
 	name, err := process.NameWithContext(ctx)
 	if err != nil {
 		return p, err
