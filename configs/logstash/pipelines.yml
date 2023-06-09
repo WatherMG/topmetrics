@@ -1,0 +1,10 @@
+- pipeline.id: topmetric_beats
+  pipeline.workers: 4
+  path.config: "/usr/share/logstash/config/pipelines/topmetrics_logs.conf"
+- pipeline.id: topmetrics_json
+  pipeline.workers: 4
+  path.config: "/usr/share/logstash/config/pipelines/topmetrics_json.conf"
+- pipeline.id: topmetrics_proto
+  pipeline.workers: 4
+  path.config: "/usr/share/logstash/config/pipelines/topmetrics_proto.conf"
+

@@ -1,0 +1,10 @@
+{
+  "host": "192.168.0.199",
+  "port": "8080",
+  "protocol": "tcp",
+  "hostname": "",
+  "count": 5,
+  "interval": "3s",
+  "timeout": "5m",
+  "type": "json"
+}
