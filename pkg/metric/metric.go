@@ -3,6 +3,7 @@ package metric
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -23,7 +24,8 @@ func NewMetric(ctx context.Context, processes []*process.Process, metricCount in
 	for i, v := range processes[:metricCount] {
 		processInfo, err := NewProcess(ctx, v)
 		if err != nil {
-			return nil, err
+			log.Println(err)
+			continue
 		}
 		m.Processes[i] = processInfo
 	}

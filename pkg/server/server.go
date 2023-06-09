@@ -1,62 +1,58 @@
 package server
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net"
 
 	"topmetrics/pkg/logstash"
-	"topmetrics/pkg/metric"
 )
 
-const (
-	maxReadBufferSize = 1024
-	maxCacheSize      = 100
-	maxFailedAttempts = 3
-)
-
-func ReceiveMetricHandler(conn net.Conn) {
-	metricsCh := make(chan *metric.Metric)
-	dataType, data, err := readData(conn)
-	if err != nil {
-		log.Println(err)
-	}
-
+func (serv *Server) receiveMetricHandler(conn net.Conn) {
 	defer closeConnection(conn)
+	for {
+		dataType, data, err := readData(conn)
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				log.Printf("Connection closed by remote host")
+				return
+			}
+			log.Println(err)
+			return
+		}
 
-	switch dataType {
-	case metric.JSONType, metric.ProtoType:
-		err = sendDataToLogstash(data, dataType)
+		handler, ok := serv.metricHandlers[dataType]
+		if !ok {
+			log.Printf("Unsupported data type: %d", dataType)
+			continue
+		}
+
+		err = handler.HandleMetric(dataType, data)
 		if err != nil {
 			log.Println(err)
-		}
-	case metric.GOBType:
-		metricInfo, err := unmarshalData(dataType, data)
-		if err != nil {
-			log.Println(err)
-		}
-		go logfileWriter(metricsCh)
-
-		if metricInfo.Processes != nil && metricInfo.Hostname != "" && metricInfo.HostId != "" {
-			metricsCh <- metricInfo
 		}
 	}
 }
 
-var failedAttempts = 0
-
-func sendDataToLogstash(data []byte, dataType byte) error {
-	if failedAttempts >= maxFailedAttempts {
+func (serv *Server) LogstashSender(data []byte, dataType byte) error {
+	if serv.failedAttempts >= maxFailedAttempts {
 		return fmt.Errorf("logstash is not responding after %d attempts. dataType flag: %d", maxFailedAttempts, dataType)
 	}
-	config, err := logstash.GetLogstashConfig(dataType)
+	config, err := logstash.GetConfig(dataType)
 	if err != nil {
 		return err
 	}
-	err = config.SendMetric(data)
+	/*defer config.Cancel()*/
+	err = config.SendMetric(serv.ctx, data)
 	if err != nil {
-		failedAttempts++
+		if a := serv.ctx.Err(); a != nil {
+			log.Println(a.Error())
+		}
+		serv.failedAttempts++
 		return err
 	}
+
 	return nil
 }

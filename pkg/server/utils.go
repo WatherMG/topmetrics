@@ -54,9 +54,9 @@ func unmarshalData(dataType byte, data []byte) (*metric.Metric, error) {
 }
 
 func logfileWriter(ch <-chan *metric.Metric) {
-	metrica := <-ch
+	metricInfo := <-ch
 	log.Printf("Writing data")
-	host := metrica.Hostname + "_" + metrica.HostId
+	host := metricInfo.Hostname + "_" + metricInfo.HostId
 
 	filePath := getFilePath(host)
 	file, err := openFile(filePath)
@@ -65,7 +65,7 @@ func logfileWriter(ch <-chan *metric.Metric) {
 	}
 	defer file.Close()
 
-	logMsg := metrica.BuildLogMsg()
+	logMsg := metricInfo.BuildLogMsg()
 	if err := fileWriter(file, []byte(logMsg)); err != nil {
 		log.Println(err)
 		return
@@ -84,8 +84,12 @@ func openFile(filePath string) (*os.File, error) {
 
 // filePathCache used for reduce i/o bound and hdd load
 var filePathCache = make(map[string]string)
+var filePathCacheMutex sync.Mutex
 
 func getFilePath(host string) string {
+	filePathCacheMutex.Lock()
+	defer filePathCacheMutex.Unlock()
+
 	filePath, ok := filePathCache[host]
 	if !ok {
 		filePath = createFilePath(host)
@@ -105,10 +109,11 @@ func createFilePath(host string) string {
 	return filepath.Join(getWorkingDir(), "logs", host+".log")
 }
 
+var fileMutex sync.Mutex
+
 func fileWriter(file io.Writer, data []byte) error {
-	var mutex sync.Mutex
-	mutex.Lock()
-	defer mutex.Unlock()
+	fileMutex.Lock()
+	defer fileMutex.Unlock()
 	if _, err := file.Write(data); err != nil {
 		return err
 	}

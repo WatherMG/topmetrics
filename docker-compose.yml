@@ -12,7 +12,7 @@ networks:
 services:
   server:
     build:
-      context: .
+      context: /
       dockerfile: cmd/server/Dockerfile
     restart:
       always

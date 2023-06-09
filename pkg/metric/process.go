@@ -11,8 +11,8 @@ import (
 	"github.com/shirou/gopsutil/v3/process"
 )
 
-func Collect(ctx context.Context, ch chan []*process.Process, duration *time.Duration) {
-	ticker := time.NewTicker(*duration)
+func Collect(ctx context.Context, ch chan []*process.Process, interval time.Duration) {
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for {
 		select {
@@ -35,15 +35,15 @@ func NewProcess(ctx context.Context, process *process.Process) (*ProcessInfo, er
 	p := &ProcessInfo{}
 	name, err := process.NameWithContext(ctx)
 	if err != nil {
-		return p, err
+		return nil, err
 	}
 	cpu, err := process.CPUPercentWithContext(ctx)
 	if err != nil {
-		return p, err
+		return nil, err
 	}
 	mem, err := process.MemoryInfoWithContext(ctx)
 	if err != nil {
-		return p, err
+		return nil, err
 	}
 
 	p.Pid = process.Pid
@@ -53,10 +53,6 @@ func NewProcess(ctx context.Context, process *process.Process) (*ProcessInfo, er
 
 	return p, nil
 }
-
-// func (p *ProcessInfo) String() string {
-// 	return fmt.Sprintf("%d, %s, %.2f%%, %.2fMB\n", p.PID, p.Name, p.CPUPercent, p.Memory)
-// }
 
 func sortProcesses(ctx context.Context, processes []*process.Process) {
 	sort.SliceStable(processes, func(i, j int) bool {
