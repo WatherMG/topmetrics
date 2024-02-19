@@ -11,8 +11,8 @@ import (
 	"github.com/shirou/gopsutil/v3/process"
 )
 
-func Collect(ctx context.Context, ch chan []*process.Process, duration *time.Duration) {
-	ticker := time.NewTicker(*duration)
+func Collect(ctx context.Context, ch chan []*process.Process, interval time.Duration) {
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for {
 		select {
@@ -31,31 +31,28 @@ func Collect(ctx context.Context, ch chan []*process.Process, duration *time.Dur
 	}
 }
 
-func (p *ProcessInfo) Get(ctx context.Context, process *process.Process) (*ProcessInfo, error) {
+func NewProcess(ctx context.Context, process *process.Process) (*ProcessInfo, error) {
+	p := &ProcessInfo{}
 	name, err := process.NameWithContext(ctx)
 	if err != nil {
-		return p, err
+		return nil, err
 	}
 	cpu, err := process.CPUPercentWithContext(ctx)
 	if err != nil {
-		return p, err
+		return nil, err
 	}
 	mem, err := process.MemoryInfoWithContext(ctx)
 	if err != nil {
-		return p, err
+		return nil, err
 	}
 
-	p.PID = process.Pid
+	p.Pid = process.Pid
 	p.Name = name
-	p.CPUPercent = cpu
-	p.Memory = float64(mem.RSS) / math.Pow(1024, 2)
+	p.CpuPercent = cpu
+	p.MemoryUsage = float64(mem.RSS) / math.Pow(1024, 2)
 
 	return p, nil
 }
-
-// func (p *ProcessInfo) String() string {
-// 	return fmt.Sprintf("%d, %s, %.2f%%, %.2fMB\n", p.PID, p.Name, p.CPUPercent, p.Memory)
-// }
 
 func sortProcesses(ctx context.Context, processes []*process.Process) {
 	sort.SliceStable(processes, func(i, j int) bool {

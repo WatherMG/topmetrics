@@ -2,7 +2,10 @@ module topmetrics
 
 go 1.20
 
-require github.com/shirou/gopsutil/v3 v3.23.4
+require (
+	github.com/shirou/gopsutil/v3 v3.23.4
+	google.golang.org/protobuf v1.26.0
+)
 
 require (
 	github.com/go-ole/go-ole v1.2.6 // indirect

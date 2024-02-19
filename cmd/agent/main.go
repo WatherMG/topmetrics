@@ -1,9 +1,7 @@
 package main
 
 import (
-	"context"
-	"flag"
-	"time"
+	"log"
 
 	"topmetrics/pkg/agent"
 	"topmetrics/pkg/metric"
@@ -11,23 +9,17 @@ import (
 	"github.com/shirou/gopsutil/v3/process"
 )
 
-var (
-	metricCount = flag.Int("count", 5, "Number of metrics to send")
-	interval    = flag.Duration("interval", 5*time.Second, "Sending interval in sec")
-	timeout     = flag.Duration("timeout", 1*time.Minute, "Duration of metrics sending in minutes")
-	host        = flag.String("host", "localhost", "Server address")
-	port        = flag.String("port", "4444", "Server port")
-)
-
 func main() {
-	flag.Parse()
-
-	ctx, cancel := context.WithTimeout(context.Background(), *timeout)
-	defer cancel()
+	agnt, err := agent.NewConfig()
+	if err != nil {
+		log.Fatalf("Agent error: %v", err)
+	}
+	defer agnt.Cancel()
 
 	processes := make(chan []*process.Process)
+	go metric.Collect(agnt.Ctx, processes, agnt.Config.Interval)
 
-	go metric.Collect(ctx, processes, interval)
-
-	agent.Send(ctx, processes, interval, metricCount, *host, *port)
+	if err = agnt.HandleMetric(processes); err != nil {
+		log.Printf("send error: %v\n", err)
+	}
 }
