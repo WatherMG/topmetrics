@@ -54,10 +54,14 @@ func (c *Connector) SendMetric(ctx context.Context, data []byte) error {
 	}
 	numBytes, err := c.Write(data)
 	if err != nil {
-		c.Close()
+		err := c.Close()
+		if err != nil {
+			return err
+		}
 		c.Conn = nil
 		return fmt.Errorf("send error: failed to send log message: %w", err)
 	}
-	log.Printf("Sent: %d bytes\n", numBytes)
+	host := net.JoinHostPort(c.Host, c.Port)
+	log.Printf("Sent: %d bytes to %s\n", numBytes, host)
 	return nil
 }

@@ -52,6 +52,7 @@ services:
       - ./configs/logstash/pipelines.yml:/usr/share/logstash/config/pipelines.yml:ro
       - ./configs/logstash/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
       - ./logs:/usr/share/logstash/input:ro
+      - /home/go/github.com/WatherMG/topmetrics/logs:/usr/share/logstash/input:ro
     depends_on:
       elasticsearch:
         condition: service_healthy

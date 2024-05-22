@@ -20,7 +20,10 @@ func (agnt *Agent) HandleMetric(ch chan []*process.Process) error {
 		select {
 		case <-agnt.Ctx.Done():
 			log.Println("Metrics sending complete.")
-			agnt.Connector.Close()
+			err := agnt.Connector.Close()
+			if err != nil {
+				return err
+			}
 			close(ch)
 			return nil
 		case processes := <-ch:
@@ -32,6 +35,7 @@ func (agnt *Agent) HandleMetric(ch chan []*process.Process) error {
 			if err != nil {
 				return err
 			}
+			metricInfo.Hostname = agnt.Hostname
 			if err = agnt.sendMetrics(agnt.Ctx, metricInfo); err != nil {
 				log.Println(err)
 				log.Println("Try to reconnect...")

@@ -53,6 +53,7 @@ func (serv *Server) LogstashSender(data []byte, dataType byte) error {
 		serv.failedAttempts++
 		return err
 	}
+	serv.failedAttempts = 0
 
 	return nil
 }

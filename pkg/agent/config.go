@@ -22,13 +22,13 @@ const (
 	reconnectTimeout      = maxFailedAttempts * 500 * time.Millisecond
 
 	// Default agent settings
-	defaultInterval      = 5 * time.Second
+	defaultInterval      = 2 * time.Second
 	defaultTimeout       = 10 * time.Minute
 	defaultCount         = 5
 	defaultSerializeType = "proto"
 
 	// Config path
-	cfgPath = "configs/agent/json_cfg.json"
+	cfgPath = "configs/agent/default_cfg_proto.json"
 )
 
 type Agent struct {
@@ -115,7 +115,12 @@ func (agnt *Agent) getConfigFile() (*Config, error) {
 	if err != nil {
 		return nil, fmt.Errorf("config error: %w", err)
 	}
-	defer conf.Close()
+	defer func(conf *os.File) {
+		err := conf.Close()
+		if err != nil {
+			return
+		}
+	}(conf)
 	if err = json.NewDecoder(conf).Decode(&cfg); err != nil {
 		return nil, fmt.Errorf("config decode error: %w", err)
 	}

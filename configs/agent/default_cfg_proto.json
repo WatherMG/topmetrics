@@ -1,0 +1,9 @@
+{
+  "host": "192.168.0.199",
+  "port": "8080",
+  "protocol": "tcp",
+  "type": "proto",
+  "interval": "2s",
+  "timeout": "10m",
+  "count": 5
+}
